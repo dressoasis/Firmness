@@ -1,9 +1,10 @@
-﻿namespace Firmness.API.Controllers;
-
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using Firmness.Application.Interfaces;
 using Firmness.Application.DTOs.Products;
 using Firmness.Application.Common;
+
+
+namespace Firmness.API.Controllers;
 
 
 /// <summary>

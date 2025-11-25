@@ -1,14 +1,11 @@
 namespace Firmness.API.Controllers;
 
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 using Firmness.Application.Interfaces;
 using Firmness.Application.DTOs.Categories;
 using Firmness.Application.Common;
 
-
-/// <summary>
-/// Manages categories in the inventory
-/// </summary>
 [ApiController]
 [Route("api/[controller]")]
 public class CategoriesController : ControllerBase
@@ -16,35 +13,96 @@ public class CategoriesController : ControllerBase
     private readonly ICategoryService _categoryService;
     private readonly ILogger<CategoriesController> _logger;
 
-    public CategoriesController(ICategoryService categoryService, ILogger<CategoriesController> logger)
+    public CategoriesController(
+        ICategoryService categoryService,
+        ILogger<CategoriesController> logger)
     {
         _categoryService = categoryService;
         _logger = logger;
-    }      
-    
-    /// <summary>
-    /// Retrieves all categories from the inventory
-    /// </summary>
-    /// <returns>A list of all categories</returns>
-    /// <response code="200">Returns the list of categories</response>
-    /// <response code="400">If there was an error loading the categories</response>
+    }
+
+    // ============================================================
+    // GET ALL — Customer & Admin
+    // ============================================================
     [HttpGet]
+    [Authorize(Roles = "Admin,Customer")]
     [ProducesResponseType(typeof(IEnumerable<CategoryDto>), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(object), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> GetAll()
     {
         var result = await _categoryService.GetAllAsync();
         return MapResultToActionResult(result);
     }
-    
-    
-    
-    
-    
-    
-    
-    
-    // ========== HELPERS (undocumented, are private) ==========
+
+
+    // ============================================================
+    // GET BY ID — Customer & Admin
+    // ============================================================
+    [HttpGet("{id:int}")]
+    [Authorize(Roles = "Admin,Customer")]
+    [ProducesResponseType(typeof(CategoryDto), StatusCodes.Status200OK)]
+    public async Task<IActionResult> Get(int id)
+    {
+        var result = await _categoryService.GetByIdAsync(id);
+        return MapResultToActionResult(result);
+    }
+
+
+    // ============================================================
+    // CREATE — Solo Admin
+    // ============================================================
+    [HttpPost]
+    [Authorize(Roles = "Admin")]
+    [ProducesResponseType(typeof(CategoryDto), StatusCodes.Status201Created)]
+    public async Task<IActionResult> Create([FromBody] CreateCategoryDto dto)
+    {
+        var result = await _categoryService.CreateAsync(dto);
+
+        if (!result.IsSuccess)
+            return MapFailure(result);
+
+        return CreatedAtAction(nameof(Get), new { id = result.Data.Id }, result.Data);
+    }
+
+
+    // ============================================================
+    // UPDATE — Solo Admin
+    // ============================================================
+    [HttpPut("{id:int}")]
+    [Authorize(Roles = "Admin")]
+    [ProducesResponseType(typeof(CategoryDto), StatusCodes.Status200OK)]
+    public async Task<IActionResult> Update(int id, [FromBody] UpdateCategoryDto dto)
+    {
+        var result = await _categoryService.UpdateAsync(id, dto);
+
+        if (!result.IsSuccess)
+            return MapFailure(result);
+
+        return Ok(result.Data);
+    }
+
+
+    // ============================================================
+    // DELETE — Solo Admin
+    // ============================================================
+    [HttpDelete("{id:int}")]
+    [Authorize(Roles = "Admin")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    public async Task<IActionResult> Delete(int id)
+    {
+        var result = await _categoryService.DeleteAsync(id);
+
+        // 👇 Aseguramos que se llame al MapFailure(Result)
+        if (!result.IsSuccess)
+            return MapFailure(result);
+
+        return NoContent();
+    }
+
+
+
+    // =====================================================================
+    // =====================   HELPERS   ===================================
+    // =====================================================================
 
     private IActionResult MapResultToActionResult<T>(ResultOft<T> result)
     {
@@ -54,32 +112,25 @@ public class CategoriesController : ControllerBase
         return MapFailure(result);
     }
 
+    // Para ResultOft<T>
     private IActionResult MapFailure<T>(ResultOft<T> result)
     {
         var error = new { error = result.ErrorMessage };
-    
-        // Si el mensaje indica "not found", devuelve 404
+
         if (result.ErrorMessage.Contains("not found", StringComparison.OrdinalIgnoreCase))
-        {
-            _logger.LogWarning("NotFound: {Message}", result.ErrorMessage);
             return NotFound(error);
-        }
-    
-        // Si el mensaje indica duplicado, devuelve 409 Conflict
+
         if (result.ErrorMessage.Contains("already exists", StringComparison.OrdinalIgnoreCase))
-        {
-            _logger.LogWarning("Conflict: {Message}", result.ErrorMessage);
             return Conflict(error);
-        }
-    
-        // Por defecto 400 BadRequest
-        _logger.LogWarning("BadRequest: {Message}", result.ErrorMessage);
+
         return BadRequest(error);
     }
 
+    // Para Result (NO genérico)
     private IActionResult MapFailure(Result result)
     {
         var message = result.ErrorMessage ?? "An error occurred";
+
         if (message.Contains("not found", StringComparison.OrdinalIgnoreCase))
             return NotFound(new { error = message });
 

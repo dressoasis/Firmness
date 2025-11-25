@@ -1,15 +1,11 @@
-﻿using Microsoft.AspNetCore.Mvc;
-using Firmness.Application.Interfaces;
+﻿using Firmness.Application.Common;
 using Firmness.Application.DTOs.Products;
-using Firmness.Application.Common;
-
+using Firmness.Application.Interfaces;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 
 namespace Firmness.API.Controllers;
 
-
-/// <summary>
-/// Manages products in the inventory
-/// </summary>
 [ApiController]
 [Route("api/[controller]")]
 public class ProductsController : ControllerBase
@@ -21,69 +17,53 @@ public class ProductsController : ControllerBase
     {
         _productService = productService;
         _logger = logger;
-    }      
-    
-    /// <summary>
-    /// Retrieves all products from the inventory
-    /// </summary>
-    /// <returns>A list of all products</returns>
-    /// <response code="200">Returns the list of products</response>
-    /// <response code="400">If there was an error loading the products</response>
+    }
+
+    // ====================== GET ALL ======================
+
     [HttpGet]
+    [Authorize(Roles = "Admin,Customer")]
     [ProducesResponseType(typeof(IEnumerable<ProductDto>), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(object), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> GetAll()
     {
         var result = await _productService.GetAllAsync();
-        return MapResultToActionResult(result);
+        return MapResult(result);
     }
 
-    /// <summary>
-    /// Retrieves a specific product by its ID
-    /// </summary>
-    /// <param name="id">The product ID</param>
-    /// <returns>The product details</returns>
-    /// <response code="200">Returns the product</response>
-    /// <response code="404">If the product is not found</response>
+    // ====================== GET BY ID ======================
+
     [HttpGet("{id:int}")]
+    [Authorize(Roles = "Admin,Customer")]
     [ProducesResponseType(typeof(ProductDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(object), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetById(int id)
     {
         var result = await _productService.GetByIdAsync(id);
-        return MapResultToActionResult(result);
+        return MapResult(result);
     }
 
-    /// <summary>
-    /// Creates a new product in the inventory
-    /// </summary>
-    /// <param name="createDto">The product data</param>
-    /// <returns>The newly created product</returns>
-    /// <response code="201">Returns the newly created product</response>
-    /// <response code="400">If the data is invalid or the product code already exists</response>
-    /// <remarks>
-    /// Sample request:
-    ///
-    ///     POST /api/products
-    ///     {
-    ///        "name": "Portland Cement",
-    ///        "category": "Construction Materials",
-    ///        "description": "High quality cement for construction",
-    ///        "code": "CEM-001",
-    ///        "price": 25000,
-    ///        "stock": 100
-    ///     }
-    ///
-    /// </remarks>
+    // ====================== SEARCH ======================
+
+    [HttpGet("search")]
+    [Authorize(Roles = "Admin,Customer")]
+    [ProducesResponseType(typeof(IEnumerable<ProductDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> Search([FromQuery] string term)
+    {
+        var result = await _productService.SearchAsync(term);
+        return MapResult(result);
+    }
+
+    // ====================== CREATE ======================
+
     [HttpPost]
+    [Authorize(Roles = "Admin")]
     [ProducesResponseType(typeof(ProductDto), StatusCodes.Status201Created)]
-    [ProducesResponseType(typeof(object), StatusCodes.Status400BadRequest)]
-    public async Task<IActionResult> Create([FromBody] CreateProductDto createDto)
+    public async Task<IActionResult> Create([FromBody] CreateProductDto dto)
     {
         if (!ModelState.IsValid)
             return BadRequest(ModelState);
 
-        var result = await _productService.CreateAsync(createDto);
+        var result = await _productService.CreateAsync(dto);
 
         if (!result.IsSuccess)
             return MapFailure(result);
@@ -91,38 +71,27 @@ public class ProductsController : ControllerBase
         return CreatedAtAction(nameof(GetById), new { id = result.Data.Id }, result.Data);
     }
 
-    /// <summary>
-    /// Updates an existing product
-    /// </summary>
-    /// <param name="id">The product ID</param>
-    /// <param name="updateDto">The updated product data</param>
-    /// <returns>The updated product</returns>
-    /// <response code="200">Returns the updated product</response>
-    /// <response code="400">If the data is invalid or IDs don't match</response>
-    /// <response code="404">If the product is not found</response>
+    // ====================== UPDATE ======================
+
     [HttpPut("{id:int}")]
+    [Authorize(Roles = "Admin")]
     [ProducesResponseType(typeof(ProductDto), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(object), StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(typeof(object), StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> Update(int id, [FromBody] UpdateProductDto updateDto)
+    public async Task<IActionResult> Update(int id, [FromBody] UpdateProductDto dto)
     {
-        if (id != updateDto.Id)
-            return BadRequest(new { error = "ID mismatch between route and payload" });
+        if (id != dto.Id)
+            return BadRequest(new { error = "Route ID and body ID do not match." });
 
         if (!ModelState.IsValid)
             return BadRequest(ModelState);
 
-        var result = await _productService.UpdateAsync(updateDto);
-        return MapResultToActionResult(result);
+        var result = await _productService.UpdateAsync(dto);
+        return MapResult(result);
     }
 
-    /// <summary>
-    /// Deletes a product from the inventory
-    /// </summary>
-    /// <param name="id">The product ID to delete</param>
-    /// <response code="204">If the product was successfully deleted</response>
-    /// <response code="404">If the product is not found</response>
+    // ====================== DELETE ======================
+
     [HttpDelete("{id:int}")]
+    [Authorize(Roles = "Admin")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(typeof(object), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Delete(int id)
@@ -135,25 +104,11 @@ public class ProductsController : ControllerBase
         return NoContent();
     }
 
-    /// <summary>
-    /// Searches products by name or code
-    /// </summary>
-    /// <param name="term">The search term (minimum 2 characters)</param>
-    /// <returns>A list of matching products</returns>
-    /// <response code="200">Returns the list of matching products</response>
-    /// <response code="400">If the search term is invalid</response>
-    [HttpGet("search")]
-    [ProducesResponseType(typeof(IEnumerable<ProductDto>), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(object), StatusCodes.Status400BadRequest)]
-    public async Task<IActionResult> Search([FromQuery] string term)
-    {
-        var result = await _productService.SearchAsync(term);
-        return MapResultToActionResult(result);
-    }
+    // ======================================================
+    // ===================== HELPERS ========================
+    // ======================================================
 
-    // ========== HELPERS (undocumented, are private) ==========
-
-    private IActionResult MapResultToActionResult<T>(ResultOft<T> result)
+    private IActionResult MapResult<T>(ResultOft<T> result)
     {
         if (result.IsSuccess)
             return Ok(result.Data);
@@ -163,33 +118,31 @@ public class ProductsController : ControllerBase
 
     private IActionResult MapFailure<T>(ResultOft<T> result)
     {
-        var error = new { error = result.ErrorMessage };
-    
-        // Si el mensaje indica "not found", devuelve 404
+        var errorObj = new { error = result.ErrorMessage };
+
         if (result.ErrorMessage.Contains("not found", StringComparison.OrdinalIgnoreCase))
         {
-            _logger.LogWarning("NotFound: {Message}", result.ErrorMessage);
-            return NotFound(error);
+            _logger.LogWarning("NotFound: {Msg}", result.ErrorMessage);
+            return NotFound(errorObj);
         }
-    
-        // Si el mensaje indica duplicado, devuelve 409 Conflict
+
         if (result.ErrorMessage.Contains("already exists", StringComparison.OrdinalIgnoreCase))
         {
-            _logger.LogWarning("Conflict: {Message}", result.ErrorMessage);
-            return Conflict(error);
+            _logger.LogWarning("Conflict: {Msg}", result.ErrorMessage);
+            return Conflict(errorObj);
         }
-    
-        // Por defecto 400 BadRequest
-        _logger.LogWarning("BadRequest: {Message}", result.ErrorMessage);
-        return BadRequest(error);
+
+        _logger.LogWarning("BadRequest: {Msg}", result.ErrorMessage);
+        return BadRequest(errorObj);
     }
 
     private IActionResult MapFailure(Result result)
     {
-        var message = result.ErrorMessage ?? "An error occurred";
-        if (message.Contains("not found", StringComparison.OrdinalIgnoreCase))
-            return NotFound(new { error = message });
+        var errorObj = new { error = result.ErrorMessage };
 
-        return BadRequest(new { error = message });
+        if (result.ErrorMessage.Contains("not found", StringComparison.OrdinalIgnoreCase))
+            return NotFound(errorObj);
+
+        return BadRequest(errorObj);
     }
 }

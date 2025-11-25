@@ -7,10 +7,10 @@ using Firmness.Application.Interfaces;
 using Firmness.Domain.Entities;
 using Firmness.Domain.Interfaces;
 using Microsoft.Extensions.Logging;
+using System.Linq;
 
 /// <summary>
-/// Provides business logic operations for managing categories,
-/// including creation, retrieval, updating, deletion, and searching.
+/// Provides business logic operations for managing categories.
 /// </summary>
 public class CategoryService : ICategoryService
 {
@@ -18,12 +18,6 @@ public class CategoryService : ICategoryService
     private readonly IMapper _mapper;
     private readonly ILogger<CategoryService> _logger;
 
-    /// <summary>
-    /// Initializes a new instance of the <see cref="CategoryService"/> class.
-    /// </summary>
-    /// <param name="categoryRepository">The repository used for data access of categories.</param>
-    /// <param name="mapper">The AutoMapper instance used for object mapping.</param>
-    /// <param name="logger">The logger used to record application events and errors.</param>
     public CategoryService(
         IGenericRepository<Category> categoryRepository,
         IMapper mapper,
@@ -34,13 +28,9 @@ public class CategoryService : ICategoryService
         _logger = logger;
     }
 
-    /// <summary>
-    /// Retrieves all categories.
-    /// </summary>
-    /// <returns>
-    /// A <see cref="ResultOft{T}"/> containing a collection of <see cref="CategoryDto"/> 
-    /// if successful, or an error message if failed.
-    /// </returns>
+    // ==========================
+    // GET ALL
+    // ==========================
     public async Task<ResultOft<IEnumerable<CategoryDto>>> GetAllAsync()
     {
         try
@@ -56,53 +46,134 @@ public class CategoryService : ICategoryService
         }
     }
 
-    public Task<ResultOft<CategoryDto>> GetByIdAsync(int id)
-    {
-        throw new NotImplementedException();
-    }
-
-    public async Task<ResultOft<CategoryDto>> CreateAsync(CreateCategoryDto createDto)
+    // ==========================
+    // GET BY ID
+    // ==========================
+    public async Task<ResultOft<CategoryDto>> GetByIdAsync(int id)
     {
         try
         {
-            var allCategories = await _categoryRepository.GetAllAsync();
+            var category = await _categoryRepository.GetByIdAsync(id);
 
-            // Map and assign automatic values
-            var category = _mapper.Map<Category>(createDto);
+            if (category == null)
+                return ResultOft<CategoryDto>.Failure("Category not found");
 
-            // Save
-            await _categoryRepository.AddAsync(category);
-            await _categoryRepository.SaveChangesAsync();
-
-            // Return succesfully result
             var dto = _mapper.Map<CategoryDto>(category);
-            _logger.LogInformation("Product '{ProductName}' created with ID {ProductId}", category.Name, category.Id);
             return ResultOft<CategoryDto>.Success(dto);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error creating product");
-            return ResultOft<CategoryDto>.Failure("Error creating product. Please try again.");
+            _logger.LogError(ex, "Error retrieving category");
+            return ResultOft<CategoryDto>.Failure("Error loading category");
         }
     }
 
-    public Task<ResultOft<CategoryDto>> UpdateAsync(UpdateCategoryDto updateDto)
+    // ==========================
+    // CREATE
+    // ==========================
+    public async Task<ResultOft<CategoryDto>> CreateAsync(CreateCategoryDto createDto)
     {
-        throw new NotImplementedException();
+        try
+        {
+            var category = _mapper.Map<Category>(createDto);
+
+            await _categoryRepository.AddAsync(category);
+            await _categoryRepository.SaveChangesAsync();
+
+            var dto = _mapper.Map<CategoryDto>(category);
+
+            _logger.LogInformation("Category '{Name}' created with ID {Id}", category.Name, category.Id);
+
+            return ResultOft<CategoryDto>.Success(dto);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error creating category");
+            return ResultOft<CategoryDto>.Failure("Error creating category. Please try again.");
+        }
     }
 
-    public Task<Result> DeleteAsync(int id)
+    // ==========================
+    // UPDATE
+    // ==========================
+    public async Task<ResultOft<CategoryDto>> UpdateAsync(int id, UpdateCategoryDto updateDto)
     {
-        throw new NotImplementedException();
+        try
+        {
+            var category = await _categoryRepository.GetByIdAsync(id);
+
+            if (category == null)
+                return ResultOft<CategoryDto>.Failure("Category not found");
+
+            // Map updates
+            _mapper.Map(updateDto, category);
+
+            await _categoryRepository.UpdateAsync(category);
+            await _categoryRepository.SaveChangesAsync();
+
+            var dto = _mapper.Map<CategoryDto>(category);
+            return ResultOft<CategoryDto>.Success(dto);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating category");
+            return ResultOft<CategoryDto>.Failure("Error updating category.");
+        }
     }
 
-    public Task<ResultOft<IEnumerable<CategoryDto>>> SearchAsync(string searchTerm)
+    // ==========================
+    // DELETE
+    // ==========================
+    public async Task<Result> DeleteAsync(int id)
     {
-        throw new NotImplementedException();
+        try
+        {
+            var category = await _categoryRepository.GetByIdAsync(id);
+
+            if (category == null)
+                return Result.Failure("Category not found");
+
+            await _categoryRepository.DeleteAsync(id);
+            await _categoryRepository.SaveChangesAsync();
+
+            return Result.Success();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error deleting category");
+            return Result.Failure("Error deleting category.");
+        }
     }
 
-    public Task<bool> ExistsAsync(int id)
+    // ==========================
+    // SEARCH
+    // ==========================
+    public async Task<ResultOft<IEnumerable<CategoryDto>>> SearchAsync(string searchTerm)
     {
-        throw new NotImplementedException();
+        if (string.IsNullOrWhiteSpace(searchTerm))
+            return ResultOft<IEnumerable<CategoryDto>>.Failure("Search term cannot be empty");
+
+        try
+        {
+            var results = await _categoryRepository.FindAsync(c =>
+                c.Name.ToLower().Contains(searchTerm.ToLower()));
+
+            return ResultOft<IEnumerable<CategoryDto>>.Success(
+                _mapper.Map<IEnumerable<CategoryDto>>(results)
+            );
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Search error");
+            return ResultOft<IEnumerable<CategoryDto>>.Failure("Error searching categories");
+        }
+    }
+
+    // ==========================
+    // EXISTS
+    // ==========================
+    public async Task<bool> ExistsAsync(int id)
+    {
+        return await _categoryRepository.ExistsAsync(id);
     }
 }

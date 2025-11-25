@@ -14,22 +14,18 @@ namespace Firmness.API.Controllers
     {
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly SignInManager<ApplicationUser> _signInManager;
-        private readonly IConfiguration _config;
 
         public AuthController(
             UserManager<ApplicationUser> userManager,
-            SignInManager<ApplicationUser> signInManager,
-            IConfiguration config)
+            SignInManager<ApplicationUser> signInManager)
         {
             _userManager = userManager;
             _signInManager = signInManager;
-            _config = config;
         }
 
         // ==========================
         //  REGISTER
         // ==========================
-
         [HttpPost("register")]
         public async Task<IActionResult> Register([FromBody] RegisterDto model)
         {
@@ -44,11 +40,14 @@ namespace Firmness.API.Controllers
             if (!result.Succeeded)
                 return BadRequest(result.Errors);
 
+            // Asignar rol por defecto
+            await _userManager.AddToRoleAsync(user, "Customer");
+
             return Ok(new { message = "Usuario registrado correctamente" });
         }
 
         // ==========================
-        //  LOGIN + GENERAR TOKEN
+        //  LOGIN + TOKEN
         // ==========================
         [HttpPost("login")]
         public async Task<IActionResult> Login([FromBody] LoginDto model)
@@ -65,12 +64,11 @@ namespace Firmness.API.Controllers
 
             var token = await GenerateJwtToken(user);
 
-
             return Ok(new { token });
         }
 
         // ==========================
-        // GENERAR EL TOKEN JWT (HS256)
+        // GENERAR JWT (HS256)
         // ==========================
         private async Task<string> GenerateJwtToken(ApplicationUser user)
         {
@@ -78,17 +76,17 @@ namespace Firmness.API.Controllers
             var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
             var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
-            // Obtener roles del usuario
+            // Obtener roles
             var roles = await _userManager.GetRolesAsync(user);
 
             var claims = new List<Claim>
             {
-                new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
+                new Claim(JwtRegisteredClaimNames.Sub, user.Id),
                 new Claim(JwtRegisteredClaimNames.Email, user.Email),
-                new Claim("uid", user.Id.ToString()),
+                new Claim("uid", user.Id),
             };
 
-            // Agregar cada rol al token
+            // Agregar roles como claims
             claims.AddRange(roles.Select(r => new Claim(ClaimTypes.Role, r)));
 
             var token = new JwtSecurityToken(
@@ -102,8 +100,9 @@ namespace Firmness.API.Controllers
             return new JwtSecurityTokenHandler().WriteToken(token);
         }
 
-
+        // ==========================
         // DTOs
+        // ==========================
         public class RegisterDto
         {
             public string Email { get; set; }

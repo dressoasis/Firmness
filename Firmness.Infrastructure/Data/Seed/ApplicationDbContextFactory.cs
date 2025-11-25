@@ -12,7 +12,7 @@ namespace Firmness.Infrastructure.Data
 
             // Cambia por tu cadena real de Railway
             optionsBuilder.UseNpgsql(
-                "Host=mainline.proxy.rlwy.net;Port=12358;Database=railway;Username=postgres;Password=dsxkZNHyryWphybiFMauuHKQxZLqdDuo"
+                "Host=bri30qnelugmsdgm1zzi-postgresql.services.clever-cloud.com;Port=50013;Database=bri30qnelugmsdgm1zzi;Username=ufuxa3dn5n77udngrn2i;Password=xGXOYCeJGYOqvB24zxno8rOPFxqyGs"
             );
 
             return new ApplicationDbContext(optionsBuilder.Options);

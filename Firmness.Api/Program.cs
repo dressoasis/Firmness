@@ -104,7 +104,15 @@ builder.Services.AddAuthentication(options =>
         ClockSkew = TimeSpan.Zero,
         RoleClaimType = ClaimTypes.Role
     };
+});
 
+// ==========================
+// AUTORIZACIÓN (ROLES/POLICIES)
+// ==========================
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy("AdminPolicy", p => p.RequireRole("Admin"));
+    options.AddPolicy("CustomerPolicy", p => p.RequireRole("Customer"));
 });
 
 // ==========================
@@ -119,7 +127,6 @@ builder.Services.AddSwaggerGen(c =>
         Version = "v1"
     });
 
-    // 🔐 JWT EN SWAGGER
     c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
         Description = "JWT Authorization header usando Bearer. Ej: 'Bearer {token}'",

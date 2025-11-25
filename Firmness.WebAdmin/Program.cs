@@ -37,7 +37,7 @@ builder.Services.AddScoped<IAuthService, AuthService>();
 // --------------------------
 // 3. AUTOMAPPER
 // --------------------------
-builder.Services.AddAutoMapper(cfg => { }, AppDomain.CurrentDomain.GetAssemblies());
+builder.Services.AddAutoMapper(AppDomain.CurrentDomain.GetAssemblies());
 
 
 // --------------------------

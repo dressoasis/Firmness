@@ -23,7 +23,7 @@ public interface ICategoryService
     /// <summary>
     /// Update an existing category.
     /// </summary>
-    Task<ResultOft<CategoryDto>> UpdateAsync(UpdateCategoryDto updateDto);
+    Task<ResultOft<CategoryDto>> UpdateAsync(int id, UpdateCategoryDto updateDto);
 
     /// <summary>
     /// Delete a category.
